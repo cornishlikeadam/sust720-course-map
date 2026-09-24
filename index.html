@@ -103,12 +103,23 @@ td:first-child{font-family:var(--display);font-weight:700;white-space:nowrap}
 .trace input{width:18px;height:18px;accent-color:var(--human);margin-top:3px}
 textarea{width:100%;min-height:74px;font:inherit;font-size:15px;padding:10px;border:1px solid var(--rule);border-radius:4px;background:var(--ground);color:var(--ink)}
 .note{font-size:13px;color:var(--muted)}
+.chat{display:flex;flex-direction:column;gap:12px}
+.chat-log{display:flex;flex-direction:column;gap:10px;max-height:460px;overflow-y:auto;padding:4px 2px}
+.msg{max-width:78ch;padding:10px 14px;border-radius:6px;font-size:15px;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.user{align-self:flex-end;background:var(--ink);color:var(--ground)}
+.msg.ai{align-self:flex-start;background:var(--ai-soft);color:var(--ink);border-left:3px solid var(--ai)}
+.msg.err{align-self:flex-start;background:var(--stop-soft);color:var(--stop)}
+.chat-form{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.chat-form textarea{flex:1 1 280px;min-height:64px}
+.send{font-family:var(--display);font-weight:700;font-size:15px;background:var(--ai);color:#fff;border:0;border-radius:4px;padding:11px 20px;cursor:pointer}
+.send:disabled{opacity:.5;cursor:wait}
+.linkbtn{background:none;border:0;color:var(--muted);font:inherit;font-size:13px;text-decoration:underline;cursor:pointer;padding:0}
 .print-only{display:none}
 @media (max-width:760px){header{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 @media print{
   body{background:#fff;padding:0 24px}
-  .bar,.trace-actions,.screen-only{display:none!important}
+  .bar,.trace-actions,.screen-only,#chat{display:none!important}
   .print-only{display:block}
   #map{min-width:0}
   .panel,.card,.detail,.mapbox{break-inside:avoid}
@@ -226,6 +237,23 @@ textarea{width:100%;min-height:74px;font:inherit;font-size:15px;padding:10px;bor
       <textarea id="revision" placeholder="Not yet run — to be filled in after the trace test."></textarea>
       <p class="note screen-only">Saved in this browser only.</p>
     </div>
+  </section>
+
+
+  <section class="panel chat" id="chat">
+    <div style="display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline">
+      <h2>Stress-test chat</h2><span class="tag t-ai">◆ Step 2 · the AI insertion point</span>
+    </div>
+    <p class="note">Describe your system or a resilience hypothesis. The AI suggests candidate 500-year shocks for you to test. Each one is a hypothesis: the Research Lead still has to back it with 2 peer-reviewed papers, and your team decides what to simulate.</p>
+    <div class="chat-log" id="chat-log" aria-live="polite">
+      <div class="msg ai">Example: "Our system is a coastal wetland food network in the Savannah River delta. We think the rice-and-oyster cycle is anti-fragile to sea-level rise." Tell me about yours.</div>
+    </div>
+    <form class="chat-form" id="chat-form">
+      <label for="chat-input" class="note" style="flex-basis:100%">Your idea</label>
+      <textarea id="chat-input" placeholder="Type your system, hypothesis, or question… (Enter to send, Shift+Enter for a new line)"></textarea>
+      <button class="send" id="chat-send" type="submit">Send</button>
+    </form>
+    <button class="linkbtn" id="chat-clear" type="button">Clear conversation</button>
   </section>
 
   <p class="note">Built from the team's Course Map Template and Stakeholder Analysis Matrix. Evidence tags: <span class="ev ev-e">evidence</span> <span class="ev ev-a">assumption</span> <span class="ev ev-t">proposed test</span>.</p>
@@ -395,6 +423,23 @@ document.getElementById("trace").innerHTML=TRACE.map((t,i)=>`<li><label><input t
 document.getElementById("trace").addEventListener("change",e=>{saved[e.target.id.split("-")[1]]=e.target.checked;try{localStorage.setItem("sust720-trace",JSON.stringify(saved))}catch(err){}});
 const ta=document.getElementById("revision");try{ta.value=localStorage.getItem("sust720-rev")||""}catch(e){}
 ta.addEventListener("input",()=>{try{localStorage.setItem("sust720-rev",ta.value)}catch(e){}});
+
+const log=document.getElementById("chat-log"),form=document.getElementById("chat-form"),input=document.getElementById("chat-input"),sendBtn=document.getElementById("chat-send");
+let chat=[];try{chat=JSON.parse(localStorage.getItem("sust720-chat")||"[]")}catch(e){}
+const saveChat=()=>{try{localStorage.setItem("sust720-chat",JSON.stringify(chat))}catch(e){}};
+function addMsg(cls,text){const d=document.createElement("div");d.className="msg "+cls;d.textContent=text;log.appendChild(d);log.scrollTop=log.scrollHeight;return d}
+chat.forEach(m=>addMsg(m.role==="user"?"user":"ai",m.content));
+form.addEventListener("submit",async e=>{e.preventDefault();const text=input.value.trim();if(!text||sendBtn.disabled)return;
+  chat.push({role:"user",content:text});addMsg("user",text);input.value="";saveChat();
+  sendBtn.disabled=true;sendBtn.textContent="Thinking…";const wait=addMsg("ai","…");
+  try{const r=await fetch("/api/stress-test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:chat})});
+    const data=await r.json().catch(()=>({error:"The server sent back something unreadable. Try again."}));
+    if(!r.ok||data.error){wait.remove();chat.pop();saveChat();addMsg("err",(data.error||"The chat didn't respond.")+" Your message wasn't saved, so send it again.");input.value=text}
+    else{wait.textContent=data.reply;chat.push({role:"assistant",content:data.reply});saveChat()}
+  }catch(err){wait.remove();chat.pop();saveChat();addMsg("err","Couldn't reach the chat. Check your connection and send again.");input.value=text}
+  finally{sendBtn.disabled=false;sendBtn.textContent="Send";log.scrollTop=log.scrollHeight}});
+input.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();form.requestSubmit()}});
+document.getElementById("chat-clear").addEventListener("click",()=>{chat=[];saveChat();log.querySelectorAll(".msg:not(:first-child)").forEach(n=>n.remove())});
 </script>
 </body>
 </html>

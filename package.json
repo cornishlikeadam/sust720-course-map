@@ -1,0 +1,8 @@
+{
+  "name": "sust720-course-map",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "latest"
+  }
+}
