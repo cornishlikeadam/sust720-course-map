@@ -21,12 +21,14 @@ const MAX_CHARS = 4000;
 const apiKey = () => (process.env.OPENCODE_API_KEY || process.env.OPENROUTER_API_KEY || "").trim().replace(/^["']|["']$/g, "");
 
 async function ask(model, messages) {
+  const t0 = Date.now();
   const r = await fetch(API_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey()}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model, max_tokens: 8000, messages: [{ role: "system", content: SYSTEM }, ...messages] }),
+    body: JSON.stringify({ model, max_tokens: 8000, reasoning_effort: "low", messages: [{ role: "system", content: SYSTEM }, ...messages] }),
   });
   const data = await r.json().catch(() => ({}));
+  console.log("timing", model, r.status, `${Date.now() - t0}ms`, JSON.stringify(data.usage || {}), `reasoning_chars=${(data.choices?.[0]?.message?.reasoning_content || "").length}`);
   return { status: r.status, ok: r.ok && !data.error, data };
 }
 
