@@ -114,6 +114,14 @@ textarea{width:100%;min-height:74px;font:inherit;font-size:15px;padding:10px;bor
 .send{font-family:var(--display);font-weight:700;font-size:15px;background:var(--ai);color:#fff;border:0;border-radius:4px;padding:11px 20px;cursor:pointer}
 .send:disabled{opacity:.5;cursor:wait}
 .linkbtn{background:none;border:0;color:var(--muted);font:inherit;font-size:13px;text-decoration:underline;cursor:pointer;padding:0}
+.tlog{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.tlog div{border-top:3px solid var(--ink);padding-top:8px;display:flex;flex-direction:column;gap:6px}
+.tlog div:nth-child(1){border-color:var(--ai)} .tlog div:nth-child(2){border-color:var(--muted)} .tlog div:nth-child(3){border-color:var(--stop)} .tlog div:nth-child(4){border-color:var(--human)}
+.tlog ul{margin:0;padding-left:18px;font-size:14.5px;display:grid;gap:4px}
+.status{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:3px;background:var(--stop-soft);color:var(--stop)}
+.runs td,.runs th{font-size:13px}
+.runs td:first-child{font-family:var(--mono);font-weight:400}
+.runs input{accent-color:var(--human);width:16px;height:16px}
 .print-only{display:none}
 @media (max-width:760px){header{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -254,6 +262,50 @@ textarea{width:100%;min-height:74px;font:inherit;font-size:15px;padding:10px;bor
       <button class="send" id="chat-send" type="submit">Send</button>
     </form>
     <button class="linkbtn" id="chat-clear" type="button">Clear conversation</button>
+  </section>
+
+  <section class="panel" id="transparency">
+    <div style="display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline">
+      <h2>Transparency log: Stress-test chat</h2><span class="status">Status: does not meet the Step 2 goal</span>
+    </div>
+    <p>Across multiple runs, the chat returns <b>research directions in words</b>. It does not model volatility, and it never processes numbers or runs a scenario. The course asks for quantitative stress-testing, so on its own this tool can't complete Step 2. <span class="ev ev-e">evidence: repeated test runs</span></p>
+    <div class="tlog">
+      <div><span class="eyebrow">What the tool actually does</span><ul>
+        <li>Reads the student's text and writes back up to 3 candidate shocks in prose</li>
+        <li>Describes a possible cascade for each shock in words</li>
+        <li>Suggests the kind of peer-reviewed papers to look for</li>
+        <li>Asks one question back about the team's hypothesis</li>
+        <li>Runs on a free language model (OpenCode Zen), so answers change from run to run</li>
+      </ul></div>
+      <div><span class="eyebrow">What it was supposed to do</span><ul>
+        <li>Algorithmic volatility modeling: simulate compounding 500-year shocks</li>
+        <li>Put numbers on each shock: probability, magnitude, timing, rate of change</li>
+        <li>Process a scenario through the team's system and show where it fails</li>
+        <li>Fill the Four-Quadrant Volatility Matrix and the Stress-Test Record</li>
+      </ul></div>
+      <div><span class="eyebrow">What it doesn't do</span><ul>
+        <li>No calculations, simulations, probabilities or data of any kind</li>
+        <li>No access to climate datasets or models</li>
+        <li>Can't read or check papers, so its research suggestions are unverified</li>
+        <li>Doesn't give the same answer twice, so no result is reproducible</li>
+        <li>Keeps no record; the log below is kept only in this browser</li>
+        <li>Can't tell whether a shock is realistic; it only sounds plausible</li>
+      </ul></div>
+      <div><span class="eyebrow">What the human has to do</span><ul>
+        <li><b>Research Lead:</b> find and read 2 peer-reviewed papers for every shock before it's used</li>
+        <li><b>Student Team:</b> do the quantitative modeling in a real tool (a spreadsheet, system-dynamics software or published climate projections)</li>
+        <li><b>Student Team:</b> choose which shock to simulate and fill the Volatility Matrix by hand</li>
+        <li><b>Student Team:</b> copy every AI output they use, with the run number, into the Stress-Test Record</li>
+        <li><b>Course Faculty:</b> review the log at the Step 3 critique and strike anything unverified</li>
+      </ul></div>
+    </div>
+    <div class="screen-only" style="display:flex;flex-direction:column;gap:8px">
+      <span class="eyebrow">Run log (this browser)</span>
+      <div class="tbl"><table class="runs">
+        <thead><tr><th>Run</th><th>Time</th><th>Model</th><th>Reply time</th><th>Quantitative output</th><th>2 papers found?</th></tr></thead>
+        <tbody id="run-log"><tr><td colspan="6" class="note">No runs yet. Every reply from the chat is logged here.</td></tr></tbody>
+      </table></div>
+    </div>
   </section>
 
   <p class="note">Built from the team's Course Map Template and Stakeholder Analysis Matrix. Evidence tags: <span class="ev ev-e">evidence</span> <span class="ev ev-a">assumption</span> <span class="ev ev-t">proposed test</span>.</p>
@@ -427,15 +479,22 @@ ta.addEventListener("input",()=>{try{localStorage.setItem("sust720-rev",ta.value
 const log=document.getElementById("chat-log"),form=document.getElementById("chat-form"),input=document.getElementById("chat-input"),sendBtn=document.getElementById("chat-send");
 let chat=[];try{chat=JSON.parse(localStorage.getItem("sust720-chat")||"[]")}catch(e){}
 const saveChat=()=>{try{localStorage.setItem("sust720-chat",JSON.stringify(chat))}catch(e){}};
+let runs=[];try{runs=JSON.parse(localStorage.getItem("sust720-runs")||"[]")}catch(e){}
+const saveRuns=()=>{try{localStorage.setItem("sust720-runs",JSON.stringify(runs))}catch(e){}};
+const runBody=document.getElementById("run-log");
+function drawRuns(){if(!runs.length)return;runBody.innerHTML="";runs.forEach((r,i)=>{const tr=document.createElement("tr");
+  tr.innerHTML=`<td>#${i+1}</td><td>${new Date(r.at).toLocaleString([], {month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}</td><td class="mono">${r.model||"unknown"}</td><td>${r.secs}s</td><td>None: text only</td><td><label><input type="checkbox" id="run-v-${i}" ${r.verified?"checked":""}> Verified</label></td>`;
+  tr.querySelector("input").addEventListener("change",e=>{r.verified=e.target.checked;saveRuns()});runBody.appendChild(tr)})}
+drawRuns();
 function addMsg(cls,text){const d=document.createElement("div");d.className="msg "+cls;d.textContent=text;log.appendChild(d);log.scrollTop=log.scrollHeight;return d}
 chat.forEach(m=>addMsg(m.role==="user"?"user":"ai",m.content));
 form.addEventListener("submit",async e=>{e.preventDefault();const text=input.value.trim();if(!text||sendBtn.disabled)return;
   chat.push({role:"user",content:text});addMsg("user",text);input.value="";saveChat();
-  sendBtn.disabled=true;sendBtn.textContent="Thinking…";const wait=addMsg("ai","…");
+  sendBtn.disabled=true;sendBtn.textContent="Thinking…";const wait=addMsg("ai","…");const t0=Date.now();
   try{const r=await fetch("/api/stress-test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:chat})});
     const data=await r.json().catch(()=>({error:"The server sent back something unreadable. Try again."}));
     if(!r.ok||data.error){wait.remove();chat.pop();saveChat();addMsg("err",(data.error||"The chat didn't respond.")+" Your message wasn't saved, so send it again.");input.value=text}
-    else{wait.textContent=data.reply;chat.push({role:"assistant",content:data.reply});saveChat()}
+    else{wait.textContent=data.reply;runs.push({at:Date.now(),model:data.model,secs:Math.round((Date.now()-t0)/1000),verified:false});saveRuns();drawRuns();chat.push({role:"assistant",content:data.reply});saveChat()}
   }catch(err){wait.remove();chat.pop();saveChat();addMsg("err","Couldn't reach the chat. Check your connection and send again.");input.value=text}
   finally{sendBtn.disabled=false;sendBtn.textContent="Send";log.scrollTop=log.scrollHeight}});
 input.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();form.requestSubmit()}});
