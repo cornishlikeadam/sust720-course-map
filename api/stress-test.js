@@ -1,6 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
-
-const client = new Anthropic();
+// Free OpenRouter models, tried in order. Free models come and go; if one is
+// retired or rate-limited, OpenRouter falls through to the next, ending with
+// its own router that picks any available free model.
+const MODELS = ["google/gemma-4-31b-it:free", "qwen/qwen3.8-27b:free", "openrouter/free"];
 
 const SYSTEM = `You are the Stress-Test partner for SCAD SUST 720 "Designing in Deep Time", Step 2 (Superforecasting & Volatility Modeling). This is the only step in the course where AI is allowed.
 
@@ -21,8 +22,8 @@ export default async function handler(req, res) {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ error: "Use POST." });
   }
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return res.status(503).json({ error: "The chat isn't set up yet: the site owner needs to add an Anthropic API key." });
+  if (!process.env.OPENROUTER_API_KEY) {
+    return res.status(503).json({ error: "The chat isn't set up yet: the site owner needs to add an OpenRouter API key." });
   }
 
   const history = Array.isArray(req.body?.messages) ? req.body.messages : [];
@@ -35,32 +36,31 @@ export default async function handler(req, res) {
   }
 
   try {
-    const response = await client.beta.messages.create({
-      model: "claude-opus-5",
-      max_tokens: 16000,
-      output_config: { effort: "medium" },
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      system: SYSTEM,
-      messages,
+    const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://sust720-course-map.vercel.app",
+        "X-Title": "SUST 720 Stress-Test Chat",
+      },
+      body: JSON.stringify({ models: MODELS, max_tokens: 1500, messages: [{ role: "system", content: SYSTEM }, ...messages] }),
     });
-    if (response.stop_reason === "refusal") {
-      return res.status(200).json({ reply: "I can't help with that one. Try rephrasing it around your system and the shocks you want to test." });
+    const data = await r.json().catch(() => ({}));
+    if (r.status === 429) {
+      return res.status(429).json({ error: "The free AI limit has been reached for now (about 50 messages a day on the free tier). Try again later." });
     }
-    const reply = response.content.filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
-    return res.status(200).json({ reply: reply || "No reply came back. Try again." });
-  } catch (err) {
-    if (err instanceof Anthropic.RateLimitError) {
-      return res.status(429).json({ error: "Too many people are chatting right now. Wait a minute and try again." });
-    }
-    if (err instanceof Anthropic.AuthenticationError) {
+    if (r.status === 401 || r.status === 403) {
       return res.status(503).json({ error: "The chat's API key isn't working. The site owner needs to check it." });
     }
-    if (err instanceof Anthropic.APIError) {
-      console.error("Anthropic API error", err.status, err.message);
+    if (!r.ok || data.error) {
+      console.error("OpenRouter error", r.status, JSON.stringify(data.error || data).slice(0, 500));
       return res.status(502).json({ error: "The AI service returned an error. Try again shortly." });
     }
+    const reply = (data.choices?.[0]?.message?.content || "").trim();
+    return res.status(200).json({ reply: reply || "No reply came back. Try again.", model: data.model });
+  } catch (err) {
     console.error(err);
-    return res.status(500).json({ error: "Something went wrong on the server. Try again." });
+    return res.status(500).json({ error: "Couldn't reach the AI service. Try again." });
   }
 }
