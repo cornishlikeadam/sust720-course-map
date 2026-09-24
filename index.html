@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SUST 720 Deep-Time Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --ground:#EDEFE8; --paper:#F8F9F5; --ink:#1B241E; --muted:#5A6659; --rule:#C9CFC3;
+  --s1:#D9D2BF; --s2:#CBC9B4; --s3:#BFC4AE; --s4:#B3BCA6; --s5:#A7B39E;
+  --ai:#2448D8; --ai-soft:#DCE3FB;
+  --stop:#A3302E; --stop-soft:#F3DCD8;
+  --human:#2F6B3F; --human-soft:#D8E8DA;
+  --hand:#B7791F;
+  --display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body:"Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --ground:#141A16; --paper:#1B231E; --ink:#E6EBE2; --muted:#9AA696; --rule:#34403A;
+    --s1:#3A372C; --s2:#35382C; --s3:#2F382D; --s4:#2A362D; --s5:#26342C;
+    --ai:#7C98FF; --ai-soft:#1F2A55; --stop:#F07C70; --stop-soft:#4A2322;
+    --human:#79C48B; --human-soft:#1E3A26; --hand:#E3A94A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --ground:#141A16; --paper:#1B231E; --ink:#E6EBE2; --muted:#9AA696; --rule:#34403A;
+  --s1:#3A372C; --s2:#35382C; --s3:#2F382D; --s4:#2A362D; --s5:#26342C;
+  --ai:#7C98FF; --ai-soft:#1F2A55; --stop:#F07C70; --stop-soft:#4A2322;
+  --human:#79C48B; --human-soft:#1E3A26; --hand:#E3A94A;
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;padding-inline:clamp(16px,4vw,48px);padding-block:28px 64px}
+.wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+h1,h2,h3{font-family:var(--display);line-height:1.08;text-wrap:balance;margin:0}
+h1{font-size:clamp(30px,4.6vw,54px);font-weight:800;letter-spacing:-.02em}
+h2{font-size:clamp(22px,2.4vw,28px);font-weight:700}
+h3{font-size:18px;font-weight:700}
+p{margin:0}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.mono{font-family:var(--mono)}
+header{display:grid;grid-template-columns:1.4fr 1fr;gap:24px;align-items:end}
+header .q{font-style:italic;color:var(--muted);max-width:62ch;margin-top:10px}
+.test{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:16px 18px;display:grid;gap:10px}
+.test dt{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.test dd{margin:2px 0 0;font-size:15px}
+.test b{font-family:var(--display)}
+/* controls */
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.bar .lbl{font-family:var(--mono);font-size:12px;color:var(--muted);margin-right:4px}
+.chip{font-family:var(--display);font-weight:500;font-size:14px;border:1.5px solid var(--ink);background:transparent;color:var(--ink);border-radius:999px;padding:6px 14px;cursor:pointer;display:inline-flex;gap:8px;align-items:center}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--ground)}
+.chip:focus-visible,.region:focus-visible,button:focus-visible{outline:3px solid var(--ai);outline-offset:2px}
+.chip .n{font-family:var(--mono);font-size:11px;opacity:.7}
+/* map */
+.mapbox{background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow-x:auto}
+#map{display:block;width:100%;min-width:900px;height:auto}
+svg text{font-family:var(--display)}
+.region{cursor:pointer}
+.region .blob{stroke:var(--ink);stroke-width:1.5;transition:stroke-width .15s}
+.region:hover .blob,.region.on .blob{stroke-width:3.5}
+.layer{transition:opacity .2s}
+.layer.off{opacity:0;pointer-events:none}
+.legend{display:flex;flex-wrap:wrap;gap:18px 28px;padding:14px 18px;border-top:1px solid var(--rule);font-size:14px}
+.legend span{display:inline-flex;gap:8px;align-items:center}
+/* detail */
+.detail{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+.detail>section{background:var(--paper);padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+.detail .head{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:baseline}
+.tag{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:3px;display:inline-block}
+.t-ai{background:var(--ai-soft);color:var(--ai)} .t-stop{background:var(--stop-soft);color:var(--stop)} .t-human{background:var(--human-soft);color:var(--human)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:15px}
+.kv dt{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding-top:3px}
+.kv dd{margin:0}
+.ev{font-family:var(--mono);font-size:10.5px;padding:1px 5px;border-radius:3px;border:1px solid currentColor;margin-left:4px;white-space:nowrap}
+.ev-e{color:var(--human)} .ev-a{color:var(--hand)} .ev-t{color:var(--ai)}
+ul.people{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:15px}
+ul.people li{display:grid;grid-template-columns:34px 1fr;gap:8px;align-items:start}
+.av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-family:var(--mono);font-size:11px;font-weight:600;border:1.5px solid var(--ink);background:var(--ground)}
+.av.nv{border-style:dashed;color:var(--muted)}
+/* lower sections */
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px}
+.panel{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.risk{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.risk div{border-top:3px solid var(--ink);padding-top:8px;display:flex;flex-direction:column;gap:4px}
+.risk div:nth-child(1){border-color:var(--stop)} .risk div:nth-child(2){border-color:var(--human)} .risk div:nth-child(3){border-color:var(--ai)} .risk div:nth-child(4){border-color:var(--hand)}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:760px}
+th,td{text-align:left;vertical-align:top;padding:9px 10px;border-bottom:1px solid var(--rule)}
+th{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:400}
+td:first-child{font-family:var(--display);font-weight:700;white-space:nowrap}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.card{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:16px 18px;display:flex;flex-direction:column;gap:8px;font-size:14.5px}
+.card .src{font-size:13px;color:var(--muted)}
+.card .src a{color:inherit}
+.trace{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.trace label{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+.trace input{width:18px;height:18px;accent-color:var(--human);margin-top:3px}
+textarea{width:100%;min-height:74px;font:inherit;font-size:15px;padding:10px;border:1px solid var(--rule);border-radius:4px;background:var(--ground);color:var(--ink)}
+.note{font-size:13px;color:var(--muted)}
+.print-only{display:none}
+@media (max-width:760px){header{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media print{
+  body{background:#fff;padding:0 24px}
+  .bar,.trace-actions,.screen-only{display:none!important}
+  .print-only{display:block}
+  #map{min-width:0}
+  .panel,.card,.detail,.mapbox{break-inside:avoid}
+  .layer.off{opacity:1}
+  @page{size:11in 8.5in;margin:.35in}
+  body{font-size:12px;padding:0}
+  .wrap{gap:14px;max-width:none}
+  #detail{display:none}
+  #print-details .detail{grid-template-columns:repeat(5,1fr);margin-bottom:10px!important}
+  .detail>section{padding:8px 10px}
+  .kv,ul.people{font-size:11px}
+  .detail h2{font-size:16px}
+  .mapbox{break-before:auto}
+  table{min-width:0;font-size:11px}
+  .risk p,.card{font-size:12px}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="print-only" id="live-link" style="font-family:var(--mono);font-size:13px;border:1px solid var(--rule);padding:10px 12px">
+    Live interactive map: <span id="live-url">https://cornishlikeadam.github.io/sust720-course-map/</span>
+  </div>
+
+  <header>
+    <div>
+      <p class="eyebrow">DIGI 230 · Milestone 1 · Interactive Course Map · client course SUST 720 Designing in Deep Time</p>
+      <h1>Where AI touches a 500-year studio</h1>
+      <p class="q">Bounded question: How might graduate students studying sustainable design use algorithmic volatility modeling to stress-test anti-fragile systems while upholding human-only stewardship during 500-year scenario planning?</p>
+    </div>
+    <dl class="test" aria-label="Five-minute test answers">
+      <div><dt>Where does AI touch this course?</dt><dd><b>One place — Step 2.</b> A volatility model proposes compound climate shocks. It stays out of Steps 1 and 4.</dd></div>
+      <div><dt>Who does it touch?</dt><dd>The <b>Research Lead</b> runs it and verifies it, the <b>Student Team</b> decides what to keep, and the <b>Course Faculty</b> can strike any scenario.</dd></div>
+    </dl>
+  </header>
+
+  <div class="bar" role="group" aria-label="Map layers">
+    <span class="lbl">LAYERS</span>
+    <button class="chip" data-layer="territory" aria-pressed="true"><span class="n">1</span>Territory</button>
+    <button class="chip" data-layer="people" aria-pressed="true"><span class="n">2</span>People</button>
+    <button class="chip" data-layer="ai" aria-pressed="true"><span class="n">3</span>AI touchpoints &amp; non-use</button>
+    <button class="chip" data-layer="handoff" aria-pressed="true"><span class="n">4</span>Hand-offs</button>
+    <button class="chip" data-layer="decision" aria-pressed="true"><span class="n">5</span>Decision power</button>
+  </div>
+
+  <div class="mapbox">
+    <svg id="map" viewBox="0 64 1200 626" role="img" aria-label="Course map of SUST 720 with five regions from learning goal to final assessment">
+      <defs>
+        <pattern id="hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="10" stroke="var(--stop)" stroke-width="3" opacity=".55"/>
+        </pattern>
+        <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink)"/></marker>
+        <marker id="arrH" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--hand)"/></marker>
+      </defs>
+      <g id="strata"></g>
+      <g id="L-territory" class="layer"></g>
+      <g id="L-ai" class="layer"></g>
+      <g id="L-handoff" class="layer"></g>
+      <g id="L-people" class="layer"></g>
+      <g id="L-decision" class="layer"></g>
+    </svg>
+    <div class="legend">
+      <span><svg width="22" height="22" viewBox="0 0 22 22"><path d="M11 2 L20 11 L11 20 L2 11 z" fill="var(--ai)"/></svg>AI insertion point</span>
+      <span><svg width="22" height="22" viewBox="0 0 22 22"><rect x="2" y="2" width="18" height="18" fill="url(#hatch)" stroke="var(--stop)" stroke-width="2"/></svg>Non-use boundary</span>
+      <span><svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="8" fill="none" stroke="var(--human)" stroke-width="3"/><circle cx="11" cy="11" r="3" fill="var(--human)"/></svg>Preserve-human-judgment zone</span>
+      <span><svg width="30" height="22" viewBox="0 0 30 22"><path d="M2 11 H26" stroke="var(--hand)" stroke-width="3" stroke-dasharray="5 3" marker-end="url(#arrH)"/></svg>Hand-off: AI output → human check</span>
+      <span><svg width="22" height="22" viewBox="0 0 22 22"><rect x="3" y="3" width="16" height="16" fill="var(--ink)"/></svg>Formal decider &nbsp;<svg width="22" height="22" viewBox="0 0 22 22"><rect x="3" y="3" width="16" height="16" fill="none" stroke="var(--ink)" stroke-width="2" stroke-dasharray="3 2"/></svg>Informal influence</span>
+      <span class="screen-only note">Click any region to open it.</span>
+    </div>
+  </div>
+
+  <div id="detail" class="detail" aria-live="polite"></div>
+  <div id="print-details" class="print-only"></div>
+
+  <section class="panel">
+    <h2>Make the risk visible</h2>
+    <div class="risk">
+      <div><span class="eyebrow">Documented concern</span><p>Graduate students push back on ethical grounds when AI enters the teaching workflow. <span class="ev ev-e">evidence: stakeholder snapshot</span></p></div>
+      <div><span class="eyebrow">Possible benefit</span><p>The model holds more interacting variables than a team can at once — permafrost thaw × acidification × biome lag across centuries — so stress tests reach compound failures, not single shocks. <span class="ev ev-a">assumption</span></p></div>
+      <div><span class="eyebrow">Preliminary safeguard</span><p>Two-paper rule: no AI-proposed shock enters the Stress-Test Record until the Research Lead ties it to two peer-reviewed empirical climate papers. Every prompt and output goes in an AI-use log that faculty read at the Step 3 critique.</p></div>
+      <div><span class="eyebrow">Unresolved question to test</span><p>Does the model's menu of shocks narrow what teams imagine? Test: one team drafts shocks by hand before seeing any model output, then compare the range and novelty of both lists. <span class="ev ev-t">proposed test</span></p></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Stakeholder snapshot</h2>
+    <p class="note">Carried from the Session 3 matrix. Rows marked ✚ were blank in the matrix and are drafted here for the team to confirm.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Group</th><th>Who</th><th>Interests</th><th>Risks</th><th>Benefits</th><th>Concerns</th><th>Unresolved questions</th></tr></thead>
+      <tbody>
+        <tr><td>Users</td><td>SCAD graduate design students (SUST 720)</td><td>Learn strategy for systems that last centuries</td><td>Building something durable but ethically thin across 500 years</td><td>Community building, urban planning, long-horizon strategy</td><td>Ethical pushback on AI in a teaching workflow</td><td>How do you design a technology to last five centuries? Who has done it?</td></tr>
+        <tr><td>Decision makers</td><td>SCAD design professors (SUST 720 faculty)</td><td>Rigor, ethics, credible grading</td><td>Uninformed building due to little AI training</td><td>Clear audit trail via AI-use log ✚</td><td>Accountability for AI-shaped work ✚</td><td>Will AI-assisted work need tagging to hold accountability?</td></tr>
+        <tr><td>People affected</td><td>Students, professors, employers</td><td>Graduates who can reason about long horizons</td><td>A system no one can stop, harming later generations</td><td>Students learn the lessons fast and well</td><td>Deskilling if judgment is handed off ✚</td><td>What does an employer count as "deep-time mastery"? ✚</td></tr>
+        <tr><td>May be excluded ✚</td><td>Students with little AI access or literacy; residents of the bioregion being designed for</td><td>Equal footing in the studio; a say in plans for their place</td><td>Falling behind peers who use the model fluently</td><td>Guest roles at the Step 4 workshop</td><td>They are designed for, not designed with</td><td>Can a bioregion resident join the Step 4 workshop as a paid participant?</td></tr>
+        <tr><td>May carry the risk ✚</td><td>Future generations (the 500-year public); the bioregion's ecosystems; students (deskilling)</td><td>Livable, repairable systems</td><td>Errors compound over centuries with no one left to answer</td><td>Plans tested against harder shocks</td><td>No voice in any decision on the map</td><td>Who speaks for them at Step 4 and Step 5?</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:14px">
+    <h2>Evidence cards behind the boundaries</h2>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <section class="grid2">
+    <div class="panel">
+      <h2>Peer trace test</h2>
+      <p class="note">Hand the map to another team with no explanation. Tick what they can do unaided.</p>
+      <ul class="trace" id="trace"></ul>
+    </div>
+    <div class="panel">
+      <h2>Revision after the trace test</h2>
+      <label for="revision" class="note">Record what the other team missed and what you changed.</label>
+      <textarea id="revision" placeholder="Not yet run — to be filled in after the trace test."></textarea>
+      <p class="note screen-only">Saved in this browser only.</p>
+    </div>
+  </section>
+
+  <p class="note">Built from the team's Course Map Template and Stakeholder Analysis Matrix. Evidence tags: <span class="ev ev-e">evidence</span> <span class="ev ev-a">assumption</span> <span class="ev ev-t">proposed test</span>.</p>
+</div>
+
+<script>
+const P = {
+  RL:{name:"Student Team Research Lead", role:"Graduate student who runs the model and verifies its output"},
+  ST:{name:"Student Team", role:"3–4 graduate sustainable-design students"},
+  CF:{name:"Course Faculty, SUST 720", role:"Compiles sources, critiques, grades with the SCAD graduate rubric"},
+  PT:{name:"Peer Teams", role:"Other SUST 720 teams who critique and score"},
+  EJ:{name:"External Jurors", role:"Outside reviewers at the co-creation workshop"},
+  FG:{name:"Future generations", role:"The 500-year public who inherit the design — no voice", nv:true},
+};
+const R = [
+  {n:1, x:130, y:170, title:"Ground", sub:"Deep-time grounding",
+   goal:"Understand deep time, geological scales, and long ecological cycles.",
+   act:"Compare deep-time frameworks through close reading (e.g. Bjornerud, <i>Timefulness</i>) and analog canvases to map 500-year ecological cycles.",
+   out:"500-Year Bioregional Baseline Canvas & Ontological Covenant",
+   people:[["ST","Researches non-extractive scholarship; names ecological keystones"],["CF","Compiles the source list"]],
+   ai:"stop", aiText:"AI stays out. The team's framework has to come from its own close reading; AI summaries would replace the deep-time literacy this step exists to build.",
+   human:true,
+   formal:["ST","Picks the bioregional standard and the core metaphysical framework"],
+   informal:["CF","The source list sets what can be chosen"],
+   evidence:"Faculty feedback on cultural humility and the honesty of the team's knowledge claims."},
+  {n:2, x:370, y:460, title:"Stress-test", sub:"Volatility modeling",
+   goal:"Use anti-fragility and superforecasting to handle complex social and ecological systems.",
+   act:"Model the system's anti-fragility against compounding 500-year climate shocks: salinity inversion, permafrost thaw, biome migration lag.",
+   out:"Four-Quadrant Volatility Matrix & Anti-Fragility Stress-Test Record",
+   people:[["RL","Runs the model; checks every shock against two papers"],["ST","Writes resilience hypotheses; traces cascading failures"],["CF","Gives a skeleton example of a sustainable engine; can strike scenarios"]],
+   ai:"insert", aiText:"AI insertion point. A volatility model proposes multi-century, non-linear shock scenarios and cascade paths — extending the team's combinatorial working memory.",
+   aiIn:"Bioregional baseline + team hypotheses + chosen climate parameters",
+   aiOut:"Candidate compound shock scenarios with cascade paths",
+   hand:{verify:"Research Lead — ties each shock to 2 peer-reviewed empirical climate papers", override:"Course Faculty can strike any scenario; the Step 1 covenant beats model output", fail:"Uncorroborated shock is dropped and logged as rejected in the Stress-Test Record; no shock, no simulation"},
+   human:false,
+   formal:["ST","Picks which non-linear biophysical shock to simulate"],
+   informal:["RL","Whoever runs the model frames the menu — and the model's list anchors the choice"],
+   evidence:"Peer review against real-world climate models."},
+  {n:3, x:610, y:170, title:"Architect", sub:"Regenerative system",
+   goal:"Design architectures for regenerative systems and set limits for AI use.",
+   act:"Design a 500-year regenerative circular system and write the rules for AI governance inside it.",
+   out:"Circular system design + written AI assistance line and non-use area",
+   people:[["ST","Designs the circular system; draws the AI assistance line"],["CF","Checks AI only assists, never replaces people; critiques coherence"]],
+   ai:"none", aiText:"No AI generation. The team's own rules for AI are written here, by hand, from the Step 2 log.",
+   hand:{verify:"Student Team reads the Stress-Test Record before any design move", override:"Course Faculty rejects a design that leans on unverified shocks", fail:"Design returns to Step 2 for re-testing"},
+   human:true,
+   formal:["ST","Sets the system architecture and the AI ethical limits"],
+   informal:["CF","Studio critique can veto in practice"],
+   evidence:"Studio evaluation of ethical rigor, circularity, and system viability."},
+  {n:4, x:850, y:460, title:"Co-create", sub:"Live workshop",
+   goal:"Prototype together across stakeholders.",
+   act:"Run a live multi-stakeholder workshop and build a physical prototype to test social equity, community durability, and temporal empathy.",
+   out:"Multi-stakeholder feedback ledger + physical prototype exhibition",
+   people:[["ST","Presents the prototype live; defends decisions under questioning"],["PT","Discuss and challenge"],["EJ","Score the prototype"],["CF","Moderates cross-team critique"]],
+   ai:"stop", aiText:"AI stays out. Simulated feeling cannot stand in for people reading each other; trust in co-creation is built between humans.",
+   human:true,
+   formal:["PT","Peers and External Jurors validate system stability and fairness between species"],
+   informal:["CF","The moderator decides whose questions get time"],
+   evidence:"Structured points for Relational Empathy, Anti-Fragility, and Plausibility."},
+  {n:5, x:1080, y:170, title:"Charter", sub:"Five-generation pact",
+   goal:"Combine cultural, scientific, and moral points of view into one capstone.",
+   act:"Complete the unified blueprint and commit to five-generation stewardship.",
+   out:"Generational Ethics Charter & Deep-Time Anti-Fragility Blueprint",
+   people:[["ST","Sign the five-generation pact; defend their ethical imprint"],["CF","Assesses deep-time mastery with the SCAD graduate rubric"],["FG","Inherit the blueprint"]],
+   ai:"none", aiText:"No AI. Grading and moral accountability stay human.",
+   human:true,
+   formal:["CF","Final project certification and grade"],
+   informal:["ST","Signing the pact binds the team to each other"],
+   evidence:"Final criteria: Moral Duty, Anti-Fragility, Systemic Craft, Analytical Precision."},
+];
+const CARDS = [
+  {t:"Automation bias", src:'Goddard, K., Roudsari, A. & Wyatt, J. C., "Automation bias: a systematic review of frequency, effect mediators, and mitigators," <i>JAMIA</i> 19(1):121–127, 2012. <a href="https://doi.org/10.1136/amiajnl-2011-000089" target="_blank" rel="noopener">doi.org/10.1136/amiajnl-2011-000089</a>',
+   who:"Research Lead and Student Team (users of the model); Course Faculty (reviewer)", ben:"Names mitigators — verification steps and accountability — that the course can build in", con:"People over-accept automated suggestions, including wrong ones, and stop searching for alternatives", imp:"Step 2 hand-off: the two-paper rule and faculty override exist to counter this", q:"Does the two-paper rule reduce anchoring on the model's shock list, or only filter it?", tag:"e"},
+  {t:"Superforecasting", src:"Tetlock, P. & Gardner, D., <i>Superforecasting: The Art and Science of Prediction</i>, Crown, 2015.",
+   who:"Student Team (forecasters); Course Faculty (evaluator)", ben:"Calibrated, updateable forecasts beat confident single stories", con:"Forecast skill is shown for horizons of about a year — not centuries", imp:"Step 2 hand-off: every AI shock is a hypothesis to verify, never a prediction", q:"What counts as a 'correct' 500-year forecast when no one can score it?", tag:"a"},
+  {t:"Deskilling from delegated judgment", src:"Team cites Cummings (2017) — <b>source to verify</b>: confirm title and that it supports the deskilling claim. Bainbridge, L., \"Ironies of Automation,\" <i>Automatica</i> 19(6), 1983, is a well-established backup.",
+   who:"Graduate students (risk carriers); Course Faculty", ben:"Keeping design and moral calls human builds the skill the course exists to teach", con:"Handing design judgment to a model erodes it", imp:"Steps 1, 3, 5 preserve-human-judgment zones; faculty read the AI-use log at Step 3", q:"Can the team show deskilling in a studio setting, or only in operators of automated systems?", tag:"t"},
+];
+const TRACE = ["Follow the sequence from learning goal to feedback and assessment","Name who acts and who decides at each step","Locate the AI insertion point","Locate the non-use boundary","Locate every preserve-human-judgment zone"];
+
+const NS="http://www.w3.org/2000/svg";
+const el=(t,a={},p)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e};
+function blob(cx,cy,rx,ry,seed){let pts=[];const n=10;for(let i=0;i<n;i++){const a=i/n*Math.PI*2;const j=1+.09*Math.sin(seed*3.1+i*2.3)+.05*Math.cos(seed*1.7+i*4.1);pts.push([cx+Math.cos(a)*rx*j,cy+Math.sin(a)*ry*j])}
+  let d="";for(let i=0;i<n;i++){const p0=pts[(i-1+n)%n],p1=pts[i],p2=pts[(i+1)%n],p3=pts[(i+2)%n];if(!i)d+=`M${p1[0].toFixed(1)},${p1[1].toFixed(1)}`;
+  const c1=[p1[0]+(p2[0]-p0[0])/6,p1[1]+(p2[1]-p0[1])/6],c2=[p2[0]-(p3[0]-p1[0])/6,p2[1]-(p3[1]-p1[1])/6];d+=`C${c1.map(v=>v.toFixed(1))} ${c2.map(v=>v.toFixed(1))} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`}return d+"Z"}
+
+const svg=document.getElementById("map");
+// strata backdrop: deep-time scale
+const st=document.getElementById("strata");
+[["var(--s1)",0],["var(--s2)",138],["var(--s3)",276],["var(--s4)",414],["var(--s5)",552]].forEach(([c,y],i)=>{
+  el("path",{d:`M0,${y} C300,${y+18} 600,${y-14} 900,${y+10} S1200,${y-6} 1200,${y} V${y+140} H0 Z`,fill:c,opacity:.45},st)});
+el("text",{x:18,y:676,"font-family":"JetBrains Mono, monospace","font-size":11,fill:"var(--muted)"},st).textContent="GOAL →";
+el("text",{x:1182,y:676,"text-anchor":"end","font-family":"JetBrains Mono, monospace","font-size":11,fill:"var(--muted)"},st).textContent="→ ASSESSMENT · YEAR 0 … YEAR 500";
+
+const LT=document.getElementById("L-territory"),LA=document.getElementById("L-ai"),LH=document.getElementById("L-handoff"),LP=document.getElementById("L-people"),LD=document.getElementById("L-decision");
+// route
+el("path",{d:"M40,320 "+R.map(r=>`L${r.x},${r.y}`).join(" ")+" L1180,320",fill:"none",stroke:"var(--ink)","stroke-width":2,"stroke-dasharray":"2 7","stroke-linecap":"round"},LT);
+R.forEach((r,i)=>{
+  const g=el("g",{class:"region",tabindex:0,role:"button","aria-label":`Step ${r.n}: ${r.title}`,"data-n":r.n},LT);
+  const d=blob(r.x,r.y,104,78,r.n);
+  el("path",{d,class:"blob",fill:`var(--s${r.n})`},g);
+  el("text",{x:r.x,y:r.y-34,"text-anchor":"middle","font-family":"JetBrains Mono, monospace","font-size":11,fill:"var(--muted)"},g).textContent=`STEP ${r.n}`;
+  el("text",{x:r.x,y:r.y-8,"text-anchor":"middle","font-size":24,"font-weight":800,fill:"var(--ink)"},g).textContent=r.title;
+  el("text",{x:r.x,y:r.y+14,"text-anchor":"middle","font-size":12,fill:"var(--muted)"},g).textContent=r.sub;
+  // assessment chip
+  const short=r.out.split(/ [&+] /)[0];
+  const w=Math.min(190,short.length*6.2+16);
+  el("rect",{x:r.x-w/2,y:r.y+26,width:w,height:22,rx:3,fill:"var(--paper)",stroke:"var(--ink)","stroke-width":1},g);
+  el("text",{x:r.x,y:r.y+41,"text-anchor":"middle","font-size":10.5,fill:"var(--ink)"},g).textContent=short.length>30?short.slice(0,29)+"…":short;
+  // AI / non-use layer
+  if(r.ai==="stop"){el("path",{d,fill:"url(#hatch)",stroke:"var(--stop)","stroke-width":3,"pointer-events":"none"},LA);
+    const bx=r.x+70,by=r.y-66;el("rect",{x:bx-44,y:by-12,width:88,height:22,rx:3,fill:"var(--stop)"},LA);
+    el("text",{x:bx,y:by+3,"text-anchor":"middle","font-size":11,"font-weight":700,fill:"var(--paper)"},LA).textContent="NO AI HERE";}
+  if(r.ai==="insert"){const ax=r.x,ay=r.y-128;
+    el("path",{d:`M${ax},${ay-20} L${ax+20},${ay} L${ax},${ay+20} L${ax-20},${ay} Z`,fill:"var(--ai)"},LA);
+    el("text",{x:ax,y:ay+5,"text-anchor":"middle","font-size":13,"font-weight":800,fill:"var(--paper)"},LA).textContent="AI";
+    el("text",{x:ax+30,y:ay-6,"font-size":11,fill:"var(--ai)","font-weight":700},LA).textContent="IN: baseline + hypotheses";
+    el("text",{x:ax+30,y:ay+9,"font-size":11,fill:"var(--ai)","font-weight":700},LA).textContent="OUT: candidate shocks";}
+  if(r.human){const hx=r.x-92,hy=r.y-58;el("circle",{cx:hx,cy:hy,r:15,fill:"var(--paper)",stroke:"var(--human)","stroke-width":4},LD);el("circle",{cx:hx,cy:hy,r:5,fill:"var(--human)"},LD);}
+  // people
+  r.people.forEach(([id],k)=>{const px=r.x-54+k*36,py=r.y+88;const nv=P[id].nv;
+    el("circle",{cx:px,cy:py,r:15,fill:"var(--paper)",stroke:nv?"var(--muted)":"var(--ink)","stroke-width":1.5,"stroke-dasharray":nv?"3 3":"none"},LP);
+    el("text",{x:px,y:py+4,"text-anchor":"middle","font-family":"JetBrains Mono, monospace","font-size":10,"font-weight":600,fill:nv?"var(--muted)":"var(--ink)"},LP).textContent=id;});
+  // decision
+  const dy=r.y+118;
+  el("rect",{x:r.x-54,y:dy,width:14,height:14,fill:"var(--ink)"},LD);
+  el("text",{x:r.x-34,y:dy+11,"font-size":11.5,"font-weight":700,fill:"var(--ink)"},LD).textContent=P[r.formal[0]].name.replace("Student Team Research Lead","Research Lead").replace(", SUST 720","")+(r.n===4?" + Jurors":"");
+  el("rect",{x:r.x-53,y:dy+20,width:12,height:12,fill:"none",stroke:"var(--ink)","stroke-width":1.5,"stroke-dasharray":"3 2"},LD);
+  el("text",{x:r.x-34,y:dy+31,"font-size":11,fill:"var(--muted)"},LD).textContent=P[r.informal[0]].name.replace("Student Team Research Lead","Research Lead").replace(", SUST 720","");
+});
+// hand-offs
+const r2=R[1],r3=R[2];
+el("path",{d:`M${r2.x},${r2.y-106} L${r2.x},${r2.y-84}`,fill:"none",stroke:"var(--hand)","stroke-width":3,"stroke-dasharray":"5 3","marker-end":"url(#arrH)"},LH);
+el("text",{x:r2.x+30,y:r2.y-104,"font-size":11,"font-weight":700,fill:"var(--hand)"},LH).textContent="① Research Lead verifies: 2 papers per shock";
+el("path",{d:`M${r2.x+104},${r2.y-10} C${r2.x+200},${r2.y-40} ${r3.x-190},${r3.y+10} ${r3.x-110},${r3.y}`,fill:"none",stroke:"var(--hand)","stroke-width":3,"stroke-dasharray":"6 4","marker-end":"url(#arrH)"},LH);
+el("text",{x:r2.x+124,y:r2.y+14,"font-size":11,"font-weight":700,fill:"var(--hand)"},LH).textContent="② Team judges verified shocks";
+el("text",{x:r2.x+124,y:r2.y+29,"font-size":11,fill:"var(--hand)"},LH).textContent="Faculty can override";
+el("text",{x:r2.x+124,y:r2.y+44,"font-size":11,fill:"var(--hand)"},LH).textContent="Fails → back to Step 2";
+
+// layer toggles
+document.querySelectorAll(".chip").forEach(b=>b.addEventListener("click",()=>{const on=b.getAttribute("aria-pressed")!=="true";b.setAttribute("aria-pressed",on);document.getElementById("L-"+b.dataset.layer).classList.toggle("off",!on)}));
+
+const ev=t=>({e:'<span class="ev ev-e">evidence</span>',a:'<span class="ev ev-a">assumption</span>',t:'<span class="ev ev-t">proposed test</span>'}[t]);
+function detailHTML(r){
+  const aiTag=r.ai==="insert"?'<span class="tag t-ai">◆ AI insertion point</span>':r.ai==="stop"?'<span class="tag t-stop">Non-use boundary</span>':'';
+  const hTag=r.human?'<span class="tag t-human">Preserve human judgment</span>':'';
+  const ppl=r.people.map(([id,doing])=>`<li><span class="av ${P[id].nv?'nv':''}">${id}</span><span><b>${P[id].name}</b> — ${doing}</span></li>`).join("");
+  const hand=r.hand?`<section><span class="eyebrow">4 · Hand-off</span><dl class="kv"><dt>Verifies</dt><dd>${r.hand.verify}</dd><dt>Overrides</dt><dd>${r.hand.override}</dd><dt>If it fails</dt><dd>${r.hand.fail}</dd></dl></section>`:`<section><span class="eyebrow">4 · Hand-off</span><p>No AI output arrives here.</p></section>`;
+  return `<div class="head" style="background:var(--paper);padding:16px 18px"><span class="eyebrow">Step ${r.n} of 5</span><h2>${r.title} — ${r.sub}</h2>${aiTag}${hTag}</div>
+  <section><span class="eyebrow">1 · Territory</span><dl class="kv"><dt>Goal</dt><dd>${r.goal}</dd><dt>Activity</dt><dd>${r.act}</dd><dt>Output</dt><dd>${r.out}</dd><dt>Feedback</dt><dd>${r.evidence}</dd></dl></section>
+  <section><span class="eyebrow">2 · People</span><ul class="people">${ppl}</ul></section>
+  <section><span class="eyebrow">3 · AI</span><p>${r.aiText}</p>${r.aiIn?`<dl class="kv"><dt>In</dt><dd>${r.aiIn}</dd><dt>Out</dt><dd>${r.aiOut}</dd><dt>Test</dt><dd>Each shock corroborated by 2 peer-reviewed empirical climate papers ${ev("t")}</dd></dl>`:""}</section>
+  ${hand}
+  <section><span class="eyebrow">5 · Decision power</span><dl class="kv"><dt>Formal</dt><dd><b>${P[r.formal[0]].name}${r.n===4?" + External Jurors":""}</b> — ${r.formal[1]}</dd><dt>Informal</dt><dd><b>${P[r.informal[0]].name}</b> — ${r.informal[1]}</dd><dt>If automated</dt><dd>${r.n===2?"The model, not the team, would choose which future gets tested.":"A graded or moral judgment would lose its accountable owner."}</dd></dl></section>`;
+}
+const detail=document.getElementById("detail");
+function openRegion(n){const r=R[n-1];detail.innerHTML=detailHTML(r);document.querySelectorAll(".region").forEach(g=>g.classList.toggle("on",+g.dataset.n===n));try{localStorage.setItem("sust720-region",n)}catch(e){}}
+document.querySelectorAll(".region").forEach(g=>{g.addEventListener("click",()=>openRegion(+g.dataset.n));g.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openRegion(+g.dataset.n)}})});
+let start=2;try{const s=+localStorage.getItem("sust720-region");if(s>=1&&s<=5)start=s}catch(e){}
+openRegion(start);
+document.getElementById("print-details").innerHTML=R.map(r=>`<div class="detail" style="margin-bottom:16px">${detailHTML(r)}</div>`).join("");
+
+document.getElementById("cards").innerHTML=CARDS.map(c=>`<article class="card"><h3>${c.t} ${ev(c.tag)}</h3><p class="src">${c.src}</p><dl class="kv"><dt>Stakeholders</dt><dd>${c.who}</dd><dt>Benefit</dt><dd>${c.ben}</dd><dt>Concern</dt><dd>${c.con}</dd><dt>Course implication</dt><dd>${c.imp}</dd><dt>Open question</dt><dd>${c.q}</dd></dl></article>`).join("");
+
+const saved=(()=>{try{return JSON.parse(localStorage.getItem("sust720-trace")||"{}")}catch(e){return {}}})();
+document.getElementById("trace").innerHTML=TRACE.map((t,i)=>`<li><label><input type="checkbox" id="trace-${i}" ${saved[i]?"checked":""}> <span>${t}</span></label></li>`).join("");
+document.getElementById("trace").addEventListener("change",e=>{saved[e.target.id.split("-")[1]]=e.target.checked;try{localStorage.setItem("sust720-trace",JSON.stringify(saved))}catch(err){}});
+const ta=document.getElementById("revision");try{ta.value=localStorage.getItem("sust720-rev")||""}catch(e){}
+ta.addEventListener("input",()=>{try{localStorage.setItem("sust720-rev",ta.value)}catch(e){}});
+</script>
+</body>
+</html>
