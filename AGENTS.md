@@ -7,7 +7,7 @@ DIGI 230 Milestone 1: an interactive map of SCAD SUST 720 "Designing in Deep Tim
 
 ## Files
 - `index.html`: the whole page as a single file, with no build step. It has five switchable layers: Territory, People, AI touchpoints, Hand-offs and Decision power. The course data lives in the `R` (steps), `P` (people) and `CARDS` (evidence) arrays in the script at the bottom, and the SVG map is drawn from those arrays.
-- `api/stress-test.js`: a Vercel serverless function behind the Stress-test chat. It calls OpenRouter's free models, uses no dependencies, and reads its key from the `OPENROUTER_API_KEY` Vercel environment variable.
+- `api/stress-test.js`: a Vercel serverless function behind the Stress-test chat. It calls free OpenCode Zen models (space-bunny-free, then big-pickle, then mimo-v2.6-flash-free), uses no dependencies, and reads its key from the `OPENCODE_API_KEY` or `OPENROUTER_API_KEY` Vercel environment variable.
 - `PROMPT.md`: the prompt for rebuilding or extending the map.
 
 ## Course rules the map encodes (don't break these)

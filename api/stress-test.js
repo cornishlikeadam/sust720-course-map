@@ -1,7 +1,7 @@
-// Free OpenRouter models, tried in order. Free models come and go; if one is
-// retired or rate-limited, OpenRouter falls through to the next, ending with
-// its own router that picks any available free model.
-const MODELS = ["google/gemma-4-31b-it:free", "qwen/qwen3.8-27b:free", "openrouter/free"];
+// Free OpenCode Zen models, tried in order. Space Bunny keeps no data (best
+// for students); the others are backups if it is busy or retired.
+const MODELS = ["space-bunny-free", "big-pickle", "mimo-v2.6-flash-free"];
+const API_URL = "https://opencode.ai/zen/v1/chat/completions";
 
 const SYSTEM = `You are the Stress-Test partner for SCAD SUST 720 "Designing in Deep Time", Step 2 (Superforecasting & Volatility Modeling). This is the only step in the course where AI is allowed.
 
@@ -17,13 +17,26 @@ Rules:
 const MAX_TURNS = 20;
 const MAX_CHARS = 4000;
 
+// Accepts the key under either name, since it was first saved as OPENROUTER_API_KEY.
+const apiKey = () => (process.env.OPENCODE_API_KEY || process.env.OPENROUTER_API_KEY || "").trim().replace(/^["']|["']$/g, "");
+
+async function ask(model, messages) {
+  const r = await fetch(API_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey()}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model, max_tokens: 8000, messages: [{ role: "system", content: SYSTEM }, ...messages] }),
+  });
+  const data = await r.json().catch(() => ({}));
+  return { status: r.status, ok: r.ok && !data.error, data };
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ error: "Use POST." });
   }
-  if (!process.env.OPENROUTER_API_KEY) {
-    return res.status(503).json({ error: "The chat isn't set up yet: the site owner needs to add an OpenRouter API key." });
+  if (!apiKey()) {
+    return res.status(503).json({ error: "The chat isn't set up yet: the site owner needs to add an OpenCode API key." });
   }
 
   const history = Array.isArray(req.body?.messages) ? req.body.messages : [];
@@ -36,29 +49,21 @@ export default async function handler(req, res) {
   }
 
   try {
-    const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://sust720-course-map.vercel.app",
-        "X-Title": "SUST 720 Stress-Test Chat",
-      },
-      body: JSON.stringify({ models: MODELS, max_tokens: 1500, messages: [{ role: "system", content: SYSTEM }, ...messages] }),
-    });
-    const data = await r.json().catch(() => ({}));
-    if (r.status === 429) {
-      return res.status(429).json({ error: "The free AI limit has been reached for now (about 50 messages a day on the free tier). Try again later." });
+    let last, authFailures = 0;
+    for (const model of MODELS) {
+      last = await ask(model, messages);
+      const reply = (last.data.choices?.[0]?.message?.content || "").trim();
+      if (last.ok && reply) return res.status(200).json({ reply, model });
+      if (last.status === 401 || last.status === 403) authFailures++;
+      console.error("OpenCode model failed", model, last.status, JSON.stringify(last.data).slice(0, 300));
     }
-    if (r.status === 401 || r.status === 403) {
+    if (authFailures === MODELS.length) {
       return res.status(503).json({ error: "The chat's API key isn't working. The site owner needs to check it." });
     }
-    if (!r.ok || data.error) {
-      console.error("OpenRouter error", r.status, JSON.stringify(data.error || data).slice(0, 500));
-      return res.status(502).json({ error: "The AI service returned an error. Try again shortly." });
+    if (last?.status === 429) {
+      return res.status(429).json({ error: "The free AI models are busy or at their limit right now. Try again in a few minutes." });
     }
-    const reply = (data.choices?.[0]?.message?.content || "").trim();
-    return res.status(200).json({ reply: reply || "No reply came back. Try again.", model: data.model });
+    return res.status(502).json({ error: "The AI service returned an error. Try again shortly." });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Couldn't reach the AI service. Try again." });
